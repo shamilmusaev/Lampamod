@@ -1,6 +1,6 @@
 (function(){
   var apiKey   = '0e7b1efdd8a37c7a5227fdcf5d5ff715';    // API ключ OpenWeatherMap
-  var cityId   = '524901';         // ID города (Москва)
+  var cityId   = '2708865';         // ID города (Handen)
   var pollMax  = 40;               // Увеличил количество попыток
   var pollInterval = 500;          // Интервал между попытками (мс)
   var pollCount = 0;
