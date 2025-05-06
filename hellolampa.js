@@ -1,27 +1,46 @@
-// 👉 hellolampa.js  — финальная версия
-(function waitRoot() {
-  /* 1. Дожидаемся, пока сам объект Lampa появится */
-  if (!window.Lampa) return setTimeout(waitRoot, 300);
+(function wait() {
+  if (!window.Lampa) return setTimeout(wait, 300);
 
-  /* 2. Ждём инициализации внутренних модулей */
-  function waitModules() {
-    const ready = Lampa.Plugin && Lampa.Noty;
+  function ready() {
+    if (!Lampa.Plugin || !Lampa.Menu || !Lampa.Noty || !Lampa.Controller) {
+      return setTimeout(ready, 300);
+    }
 
-    if (!ready) return setTimeout(waitModules, 300);
+    const ID = 'hello_button';
 
-    /* 3. Регистрируемся как плагин */
-    Lampa.Plugin.register('hello_world', {
-      title:       'Hello World',
-      version:     '1.0.0',
-      description: 'Минимальный рабочий пример',
+    // Регистрируем плагин
+    Lampa.Plugin.register(ID, {
+      title: 'Кнопка Привет',
+      version: '1.0.0',
+      description: 'Добавляет кнопку в меню',
       run() {
-        Lampa.Noty.show(' 👋 Привет из моего плагина!');
+        Lampa.Noty.show('👋 Привет! Это моя первая кнопка.');
       }
     });
 
-    /* 4. Запускаем свой run() вручную */
-    Lampa.Plugin.run('hello_world');
+    // Добавляем пункт в главное меню
+    Lampa.Menu.add({
+      title: '👋 Привет',
+      component: ID,
+      id: ID,
+      icon: 'icon-folder',
+      class: ''
+    });
+
+    // Добавляем контроллер для обработки нажатия
+    Lampa.Controller.add(ID, {
+      toggle() {
+        Lampa.Controller.title('👋 Привет');
+        Lampa.Noty.show('👋 Привет! Это моя первая кнопка.');
+      },
+      back() {
+        Lampa.Controller.toggle('menu');
+      }
+    });
+
+    // Активируем run() при загрузке
+    Lampa.Plugin.run(ID);
   }
 
-  waitModules();
+  ready();
 })();
