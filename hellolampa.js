@@ -1,7 +1,7 @@
-// hello.js — минимальный рабочий плагин
 (() => {
+  try {
     if (typeof Lampa === 'undefined') return;
-  
+
     Lampa.Plugin.register('hello_world', {
       title: 'Hello World',
       version: '1.0',
@@ -10,4 +10,7 @@
         Lampa.Noty.show('Привет из моего плагина!');
       }
     });
-  })();
+  } catch (e) {
+    console.error('Ошибка в плагине hello_world:', e);
+  }
+})();
