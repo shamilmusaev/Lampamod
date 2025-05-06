@@ -1,7 +1,9 @@
-(() => {
-  try {
-    if (typeof Lampa === 'undefined') return;
+(function waitForLampa() {
+  if (typeof window.Lampa === 'undefined' || typeof Lampa.Plugin === 'undefined') {
+    return setTimeout(waitForLampa, 500);
+  }
 
+  try {
     Lampa.Plugin.register('hello_world', {
       title: 'Hello World',
       version: '1.0',
