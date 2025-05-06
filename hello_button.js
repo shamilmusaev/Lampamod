@@ -1,5 +1,5 @@
 (function(){
-  var apiKey   = 'ВАШ_API_KEY';    // ← замените на ваш ключ
+  var apiKey   = '0e7b1efdd8a37c7a5227fdcf5d5ff715';    // ← замените на ваш ключ
   var cityId   = '524901';         // ← ID города (Москва)
   var pollMax  = 20;               // сколько раз опрашивать DOM (по 0.5 с)
   var pollCount = 0;
