@@ -8,7 +8,7 @@
   
   // Настройки плагина
   var config = {
-    apiKey: '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', // Замените на ваш API ключ от openrouter.ai
+    apiKey: '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', // Замените на ваш API ключ от openrouter.ai
     modelName: 'qwen/qwen3-30b-a3b:free',
     debug: true,
     maxRetries: 3,
@@ -28,33 +28,120 @@
   
   // Получение данных о текущем фильме/сериале
   function getCurrentMediaInfo() {
-    if (!window.Lampa || !Lampa.Activity || !Lampa.Activity.active) {
-      log('Не удалось получить активное activity');
+    if (!window.Lampa) {
+      log('Объект Lampa не найден');
       return null;
     }
     
     try {
-      var activity = Lampa.Activity.active();
-      if (!activity.card || !activity.card.id) {
-        log('В активном activity нет данных о карточке');
+      // Несколько способов получить информацию о фильме
+      var info = null;
+      
+      // Способ 1: через активное Activity
+      if (Lampa.Activity && Lampa.Activity.active) {
+        var activity = Lampa.Activity.active();
+        if (activity && activity.card && activity.card.id) {
+          log('Получаем данные через Activity.active()');
+          info = {
+            id: activity.card.id,
+            title: activity.card.title || '',
+            original_title: activity.card.original_title || '',
+            overview: activity.card.overview || '',
+            description: activity.card.description || '',
+            year: activity.card.year || '',
+            genres: (activity.card.genres || []).map(g => (typeof g === 'object' ? g.name : g)).join(', '),
+            countries: (activity.card.countries || []).map(c => (typeof c === 'object' ? c.name : c)).join(', '),
+            directors: (activity.card.directors || []).join(', '),
+            actors: (activity.card.actors || []).slice(0, 5).join(', '),
+            type: activity.card.type || 'movie'
+          };
+        }
+      }
+      
+      // Способ 2: через текущий Controller (во многих версиях Lampa)
+      if (!info && Lampa.Controller && Lampa.Controller.enabled()) {
+        var controller = Lampa.Controller.enabled();
+        if (controller && controller.card) {
+          log('Получаем данные через Controller.enabled()');
+          info = {
+            id: controller.card.id || '',
+            title: controller.card.title || '',
+            original_title: controller.card.original_title || '',
+            overview: controller.card.overview || '',
+            description: controller.card.description || '',
+            year: controller.card.year || '',
+            genres: (controller.card.genres || []).map(g => (typeof g === 'object' ? g.name : g)).join(', '),
+            countries: (controller.card.countries || []).map(c => (typeof c === 'object' ? c.name : c)).join(', '),
+            directors: (controller.card.directors || []).join(', '),
+            actors: (controller.card.actors || []).slice(0, 5).join(', '),
+            type: controller.card.type || 'movie'
+          };
+        }
+      }
+      
+      // Способ 3: через DOM
+      if (!info) {
+        log('Пытаемся извлечь информацию из DOM');
+        
+        var title = '';
+        var year = '';
+        var description = '';
+        
+        // Ищем заголовок
+        var titleElements = document.querySelectorAll('h1, h2, .title, .card__title, .full-start__title, [class*="title"]');
+        if (titleElements.length > 0) {
+          title = titleElements[0].textContent.trim();
+          
+          // Пытаемся извлечь год из заголовка, если он там есть в формате "Название (2023)"
+          var yearMatch = title.match(/\((\d{4})\)$/);
+          if (yearMatch) {
+            year = yearMatch[1];
+            title = title.replace(/\s*\(\d{4}\)$/, '').trim();  // Удаляем год из заголовка
+          }
+        }
+        
+        // Ищем описание
+        var descElements = document.querySelectorAll('.description, .card__description, .full-start__descr, [class*="descr"], [class*="overview"]');
+        if (descElements.length > 0) {
+          description = descElements[0].textContent.trim();
+        }
+        
+        // Если не нашли год в заголовке, ищем отдельно
+        if (!year) {
+          var yearElements = document.querySelectorAll('.year, .card__year, .info__year, [class*="year"]');
+          if (yearElements.length > 0) {
+            var yearText = yearElements[0].textContent.trim();
+            var yearMatch = yearText.match(/\d{4}/);
+            if (yearMatch) {
+              year = yearMatch[0];
+            }
+          }
+        }
+        
+        // Если нашли хотя бы название
+        if (title) {
+          info = {
+            id: 'dom_extracted',
+            title: title,
+            original_title: '',
+            overview: description,
+            description: description,
+            year: year,
+            genres: '',
+            countries: '',
+            directors: '',
+            actors: '',
+            type: 'movie'
+          };
+        }
+      }
+      
+      if (!info) {
+        log('Не удалось получить информацию о фильме ни одним из способов');
         return null;
       }
       
-      var info = {
-        id: activity.card.id,
-        title: activity.card.title || '',
-        original_title: activity.card.original_title || '',
-        overview: activity.card.overview || '',
-        description: activity.card.description || '',
-        year: activity.card.year || '',
-        genres: (activity.card.genres || []).map(g => (typeof g === 'object' ? g.name : g)).join(', '),
-        countries: (activity.card.countries || []).map(c => (typeof c === 'object' ? c.name : c)).join(', '),
-        directors: (activity.card.directors || []).join(', '),
-        actors: (activity.card.actors || []).slice(0, 5).join(', '),
-        type: activity.card.type || 'movie'
-      };
-      
-      log('Получены данные о медиа: ' + info.title + ' (' + info.year + ')');
+      log('Получены данные о медиа: ' + info.title + (info.year ? ' (' + info.year + ')' : ''));
       return info;
     } catch (e) {
       log('Ошибка при получении информации о медиа: ' + e.message);
@@ -252,7 +339,38 @@ ${mediaInfo.actors ? '- Актеры: ' + mediaInfo.actors : ''}
     }
     
     var activity = Lampa.Activity.active();
-    if (!activity || !activity.activity || activity.activity.component !== 'full') {
+    log('Текущая активность: ' + (activity ? JSON.stringify({
+      url: activity.url,
+      component: activity.component,
+      id: activity.id,
+      method: activity.method,
+      params: JSON.stringify(activity.params)
+    }) : 'нет активности'));
+    
+    // Расширенная проверка на страницу фильма (проверяем несколько вариантов)
+    var isFilmPage = false;
+    
+    if (activity) {
+      // Проверка через component
+      if (activity.component === 'full' || activity.component === 'movie' || activity.component === 'full_start') {
+        isFilmPage = true;
+      }
+      // Проверка через URL
+      else if (activity.url && (
+        activity.url.indexOf('/view') >= 0 || 
+        activity.url.indexOf('/movie') >= 0 || 
+        activity.url.indexOf('/film') >= 0 ||
+        activity.url.indexOf('/detail') >= 0
+      )) {
+        isFilmPage = true;
+      }
+      // Проверка через наличие card
+      else if (activity.card && activity.card.id) {
+        isFilmPage = true;
+      }
+    }
+    
+    if (!isFilmPage) {
       log('Не на странице просмотра фильма/сериала');
       return;
     }
@@ -272,13 +390,53 @@ ${mediaInfo.actors ? '- Актеры: ' + mediaInfo.actors : ''}
     
     log('Загружаем рекомендации для: ' + mediaInfo.title);
     
-    // Находим контейнер для вставки
-    var insertContainer = document.querySelector('.full-start__buttons');
+    // Находим контейнер для вставки (проверяем несколько возможных селекторов)
+    var possibleSelectors = [
+      '.full-start__buttons',
+      '.full-start__title',
+      '.card__buttons',
+      '.card--button',
+      '.card--details',
+      '.details__wrap',
+      '.card__view',
+      '.full__detail',
+      '.full-details__buttons',
+      '.full-start',
+      '.view--torrent',
+      '.card__description',
+      '.watch',
+      '.full-info__descr',
+      '.full-info'
+    ];
+    
+    var insertContainer = null;
+    
+    for(var i = 0; i < possibleSelectors.length; i++) {
+      var container = document.querySelector(possibleSelectors[i]);
+      if(container) {
+        log('Найден контейнер: ' + possibleSelectors[i]);
+        insertContainer = container;
+        break;
+      }
+    }
+    
     if (!insertContainer) {
-      insertContainer = document.querySelector('.full-start__title');
-      if (!insertContainer) {
-        log('Не удалось найти контейнер для вставки рекомендаций');
-        return;
+      // Если не нашли ни один из контейнеров, ищем элемент, содержащий описание
+      var allElements = document.querySelectorAll('div, section');
+      for(var i = 0; i < allElements.length; i++) {
+        var el = allElements[i];
+        if(el.textContent && el.textContent.length > 100 && el.children.length > 0) {
+          // Вероятно это может быть контейнер с описанием фильма
+          insertContainer = el;
+          log('Найден контейнер по содержанию текста');
+          break;
+        }
+      }
+      
+      if(!insertContainer) {
+        // Последний вариант - добавляем в body
+        insertContainer = document.body;
+        log('Не удалось найти подходящий контейнер, вставляем в body');
       }
     }
     
@@ -317,17 +475,65 @@ ${mediaInfo.actors ? '- Актеры: ' + mediaInfo.actors : ''}
     log('Инициализация плагина рекомендаций похожих фильмов');
     
     if (window.Lampa && Lampa.Listener) {
-      // Слушаем событие открытия карточки фильма/сериала
-      Lampa.Listener.follow('full', function(e) {
-        log('Событие full сработало');
-        setTimeout(insertRecommendations, 1000);
-      });
+      // Слушаем различные события, которые могут означать открытие фильма/сериала
+      var events = ['full', 'activity', 'mount', 'ready', 'app', 'view', 
+                    'controller', 'download', 'render', 'loading', 'open',
+                    'route', 'navigate', 'display', 'content', 'card', 'movie'];
       
-      // Также проверяем при смене активности
-      Lampa.Listener.follow('activity', function(e) {
-        if (e.component === 'full') {
-          log('Событие activity сработало (full)');
-          setTimeout(insertRecommendations, 1000);
+      events.forEach(function(event) {
+        try {
+          Lampa.Listener.follow(event, function(e) {
+            log('Событие ' + event + ' сработало');
+            setTimeout(function() {
+              // Проверяем, если это страница фильма
+              if (window.Lampa.Activity && Lampa.Activity.active()) {
+                var activity = Lampa.Activity.active();
+                if (activity) {
+                  // Проверяем по нескольким признакам, что это страница фильма
+                  var isFilmPage = false;
+                  
+                  // Проверка по component
+                  if (activity.component === 'full' || activity.component === 'movie') {
+                    isFilmPage = true;
+                  }
+                  // Проверка по наличию card
+                  else if (activity.card && activity.card.id) {
+                    isFilmPage = true;
+                  }
+                  // Проверка по URL
+                  else if (activity.url && (
+                    activity.url.indexOf('/view') >= 0 || 
+                    activity.url.indexOf('/movie') >= 0 || 
+                    activity.url.indexOf('/film') >= 0
+                  )) {
+                    isFilmPage = true;
+                  }
+                  
+                  if (isFilmPage) {
+                    log('Событие ' + event + ' привело к странице фильма');
+                    insertRecommendations();
+                  }
+                }
+              } else {
+                // Попробуем понять по DOM, что это страница фильма
+                var selectors = ['.full-start__buttons', '.full-start__title', '.card__buttons', 
+                                '.card--details', '.full-details__buttons'];
+                var found = false;
+                selectors.forEach(function(sel) {
+                  if (document.querySelector(sel)) {
+                    found = true;
+                  }
+                });
+                
+                if (found) {
+                  log('Определили страницу фильма по DOM после события ' + event);
+                  insertRecommendations();
+                }
+              }
+            }, 1000);
+          });
+        } catch (e) {
+          log('Ошибка при подписке на событие ' + event + ': ' + e.message);
         }
       });
     } else {
@@ -353,19 +559,79 @@ ${mediaInfo.actors ? '- Актеры: ' + mediaInfo.actors : ''}
   }
   
   // Отложенная инициализация для уверенности, что Lampa полностью загружена
-  if (window.Lampa) {
-    setTimeout(init, 1000);
-  } else {
-    document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(function() {
-        if (window.Lampa) {
-          init();
-        } else {
-          log('Lampa не обнаружена даже после загрузки DOM');
+  function checkAndInit() {
+    if (window.Lampa) {
+      log('Lampa обнаружена, запускаем инициализацию');
+      init();
+      
+      // Установим интервал для периодической проверки страницы фильма
+      setInterval(function() {
+        if (document.querySelector('.simlar-movies-container')) {
+          // Рекомендации уже добавлены, пропускаем
+          return;
         }
-      }, 2000);
-    });
+        
+        // Проверяем, находимся ли мы на странице фильма
+        var isFilmPage = false;
+        
+        // Проверка через DOM
+        var domIndicators = [
+          '.full-start__buttons', '.full-start__title', '.card__buttons', 
+          '.card--details', '.full-details__buttons', '.card__view'
+        ];
+        
+        for (var i = 0; i < domIndicators.length; i++) {
+          if (document.querySelector(domIndicators[i])) {
+            isFilmPage = true;
+            break;
+          }
+        }
+        
+        // Проверка через Lampa API
+        if (!isFilmPage && window.Lampa.Activity && Lampa.Activity.active()) {
+          var activity = Lampa.Activity.active();
+          if (activity && (
+            (activity.component === 'full' || activity.component === 'movie') ||
+            (activity.card && activity.card.id) ||
+            (activity.url && (
+              activity.url.indexOf('/view') >= 0 || 
+              activity.url.indexOf('/movie') >= 0 || 
+              activity.url.indexOf('/film') >= 0
+            ))
+          )) {
+            isFilmPage = true;
+          }
+        }
+        
+        if (isFilmPage) {
+          log('Обнаружена страница фильма при периодической проверке');
+          insertRecommendations();
+        }
+      }, 5000); // Проверка каждые 5 секунд
+    } else {
+      log('Lampa не обнаружена, повторяем через 2 секунды');
+      setTimeout(checkAndInit, 2000);
+    }
   }
+  
+  // Запускаем проверку наличия Lampa
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(checkAndInit, 1000);
+    });
+  } else {
+    setTimeout(checkAndInit, 1000);
+  }
+  
+  // Также подписываемся на изменения URL, это может означать переход на новую страницу
+  var lastUrl = window.location.href;
+  setInterval(function() {
+    if (lastUrl !== window.location.href) {
+      lastUrl = window.location.href;
+      log('Обнаружено изменение URL: ' + lastUrl);
+      setTimeout(insertRecommendations, 2000);
+    }
+  }, 2000);
   
   log('Плагин рекомендаций похожих фильмов загружен');
 })();
